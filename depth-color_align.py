@@ -52,8 +52,9 @@ try:
             continue
 
         depth_image = np.asanyarray(aligned_depth_frame.get_data())
+        print(np.count_nonzero(depth_image))
         color_image = np.asanyarray(color_frame.get_data())
-
+        #print(depth_image)
         # Remove background - Set pixels further than clipping_distance to grey
         white_color = 255
         depth_image_3d = np.dstack(
