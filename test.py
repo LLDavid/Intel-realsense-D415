@@ -1,8 +1,8 @@
+import open3d
 import pyrealsense2 as rs
 import numpy as np
-from open3d import *
-from matplotlib import pyplot
-from mpl_toolkits.mplot3d import Axes3D
+
+
 # Declare pointcloud object, for calculating pointclouds and texture mappings
 pc = rs.pointcloud()
 # We want the points object to be persistent so we can display the last cloud when a frame drops
@@ -34,39 +34,41 @@ try:
 
         # Generate the pointcloud and texture mappings
         np_depth = np.asanyarray(depth.get_data())
+        np_color = np.asanyarray(color.get_data())
         points = pc.calculate(depth)
 
         vtx = np.asanyarray(points.get_vertices())
         tex = np.asanyarray(points.get_texture_coordinates())
-        a = vtx[1]
         np_vtx=np.zeros((len(vtx),3))
+        np_color_v=np.zeros((len(vtx),3))
+        print(np_color.shape)
+        print(max(tex))
         for i in range(len(vtx)):
+            cx= min(480-1-int(tex[i][0]*(480-1)),480-1)
+            #print(tex[i][0])
+            cy= min(640-1-int(tex[i][1]*(640-1)), 640-1)
+            #print(cx,cy)
+            #print(cx)
+            np_color_v[i,:] = np_color[cx, cy,:]/255.
             a=vtx[i]
             np_vtx[i, 0] = a[0]
             np_vtx[i,1] = a[1]
             np_vtx[i, 2] = a[2]
-            print(np_vtx[i,:])
-            if (np.absolute(np_vtx[i, 0]>17)) | np.absolute((np_vtx[i, 1]>17)) | np.absolute((np_vtx[i, 2]>17)):
+            # print(np_vtx[i,:])
+            if (np.absolute(np_vtx[i, 0]>1)) or np.absolute((np_vtx[i, 1]>1)) or np.absolute((np_vtx[i, 2]>1)):
                 #print(np_vtx[i, :])
                 np_vtx[i, :]=np.array([0,0,0])
+        # Export point cloud to ply
+        pcd = open3d.PointCloud()
+        pcd.points = open3d.Vector3dVector(np_vtx)
+        pcd.colors = open3d.Vector3dVector(np_color_v)
+        file_path = '.\\ply\\' + str(frame_id) + '.ply'
+        open3d.write_point_cloud(file_path, pcd)
 
-        # discard_index+=[i]
-        # np.delete(vtx,  discard_index, 0)
-        # np.delete(tex, discard_index, 0)
-        fig = pyplot.figure()
-        ax = Axes3D(fig)
-        #ax.scatter(vtx[:,0], vtx[:,1], vtx[:,2])
-        print(np_vtx[:, 0])
-        ax.scatter(np_vtx[:, 0], np_vtx[:, 1], np_vtx[:, 2],s=1)
-        pyplot.show()
-        # print("Saving to i.ply...")
-        file_path='.\\ply\\'+str(frame_id)+'.ply'
-        # points.export_to_ply(file_path, color)
-        # print("Done")
         # Read PLY
-        pcd = read_point_cloud(file_path)
+        pcd1 = open3d.read_point_cloud(file_path)
         # Visualize PLY
-        draw_geometries([pcd])
+        open3d.draw_geometries([pcd1])
 
 finally:
     pipeline_1.stop()
