@@ -1,77 +1,119 @@
-import open3d
+from open3d import *
 import pyrealsense2 as rs
 import numpy as np
-
-
-# Declare pointcloud object, for calculating pointclouds and texture mappings
-pc = rs.pointcloud()
-# We want the points object to be persistent so we can display the last cloud when a frame drops
-points = rs.points()
-
-# Declare RealSense pipeline, encapsulating the actual device and sensors
-pipeline_1 = rs.pipeline()
-config_1 = rs.config()
-config_1.enable_device('821312060330'), # Copy the serial number from the viewer or device manager
-config_1.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
-config_1.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
-# Start streaming
-profile_1 = pipeline_1.start(config_1)
-frame_id=0
-try:
-    while True:
-        # Wait for the next set of frames from the camera
-        frames = pipeline_1.wait_for_frames()
-
-        # Fetch color and depth frames
-        depth = frames.get_depth_frame()
-        color = frames.get_color_frame()
-        if not depth or not color:
-            continue
-        frame_id=frame_id+1
-        # if frame_id ==2:
-        #     break
-        pc.map_to(color)
-
-        # Generate the pointcloud and texture mappings
-        np_depth = np.asanyarray(depth.get_data())
-        np_color = np.asanyarray(color.get_data())
-        points = pc.calculate(depth)
-
-        vtx = np.asanyarray(points.get_vertices())
-        tex = np.asanyarray(points.get_texture_coordinates())
-        np_vtx=np.zeros((len(vtx),3))
-        np_color_v=np.zeros((len(vtx),3))
-        print(np_color.shape)
-        print(max(tex))
-        for i in range(len(vtx)):
-            cx= min(480-1-int(tex[i][0]*(480-1)),480-1)
-            #print(tex[i][0])
-            cy= min(640-1-int(tex[i][1]*(640-1)), 640-1)
-            #print(cx,cy)
-            #print(cx)
-            np_color_v[i,:] = np_color[cx, cy,:]/255.
-            a=vtx[i]
-            np_vtx[i, 0] = a[0]
-            np_vtx[i,1] = a[1]
-            np_vtx[i, 2] = a[2]
-            # print(np_vtx[i,:])
-            if (np.absolute(np_vtx[i, 0]>1)) or np.absolute((np_vtx[i, 1]>1)) or np.absolute((np_vtx[i, 2]>1)):
-                #print(np_vtx[i, :])
-                np_vtx[i, :]=np.array([0,0,0])
-        # Export point cloud to ply
-        pcd = open3d.PointCloud()
-        pcd.points = open3d.Vector3dVector(np_vtx)
-        pcd.colors = open3d.Vector3dVector(np_color_v)
-        file_path = '.\\ply\\' + str(frame_id) + '.ply'
-        open3d.write_point_cloud(file_path, pcd)
-
-        # Read PLY
-        pcd1 = open3d.read_point_cloud(file_path)
-        # Visualize PLY
-        open3d.draw_geometries([pcd1])
-
-finally:
-    pipeline_1.stop()
+import cv2
+from ManualRegister_2PC import *
+from datetime import datetime
+from register_utils import *
+from pc_utils import *
 
 
 
+
+def checkerboard_cali_1():
+    PATTERN_SIZE=(5, 7)
+    corners_pc=np.zeros((PATTERN_SIZE[0]*PATTERN_SIZE[1],3,4))
+    ## get corner points on checkerboard
+    #SID_list = [822512060625, 821312060330, 821212061385, 822512060979]
+    SID_list = [822512060625]
+    for i in range(len(SID_list)):
+        SID=SID_list[i]
+        profile, pipeline, depth_scale = get_profile(SID)
+        print("depth scale:"+str(depth_scale))
+        align_to = rs.stream.color
+        align = rs.align(align_to)
+        try:
+            frame_id = 0
+            while True:
+                # Get aligned frame
+                frames = pipeline.wait_for_frames()
+                aligned_frames_rgbd = align.process(frames)
+                # not use the aligned depth frame for mannual deprojection
+                aligned_frames = frames
+                aligned_depth_frame = aligned_frames.get_depth_frame()  # aligned_depth_frame is a 640x480 depth image
+                color_frame = aligned_frames.get_color_frame()
+                if not color_frame or not aligned_frames:
+                    continue
+                # Transform color and depth images to np array
+                color_image = np.asanyarray(color_frame.get_data())
+                depth_image = np.asanyarray(aligned_depth_frame.get_data())
+                # Count frame
+                frame_id+=1
+                # Get intrinsic parameters
+                tt = profile.get_stream(rs.stream.depth)
+                depth_intr = tt.as_video_stream_profile().get_intrinsics()
+                depth_to_color_extrin = aligned_depth_frame.profile.get_extrinsics_to(color_frame.profile)
+                pinhole_camera_intrinsic = PinholeCameraIntrinsic(get_intrinsic_matrix(color_frame))
+                # Get ordered corner points
+                points=np.zeros((3,1))
+
+                found, corners, start_id = find_checkerboard(color_image, PATTERN_SIZE)
+                # Create a buffer depth image
+                print(depth_image.shape)
+                depth_image_rgbd=np.ones(depth_image.shape)*100
+                if found:
+                    for j in range(PATTERN_SIZE[0]*PATTERN_SIZE[1]):
+                        ## 1st method: calculate from intrinsic parameters
+                        ## 2nd method: use the deproject funciton
+                        ## 3rd method: create from rgbd image
+                        pixel=[corners[j, 0, 0], corners[j, 0, 1]]
+                        pixel_x = int(np.round(pixel[0]))
+                        pixel_y = int(np.round(pixel[1]))
+                        depth_value=depth_image[pixel_y, pixel_x]
+                        points = rs.rs2_deproject_pixel_to_point(depth_intr, pixel, depth_scale)
+                        points = rs.rs2_transform_point_to_point(depth_to_color_extrin, points)
+                        points[2]= depth_value
+                        corners_pc[j, 0, i] = points[0]
+                        corners_pc[j, 1, i] = points[1]
+                        corners_pc[j, 2, i] = points[2]
+                        depth_image_rgbd[pixel_y, pixel_x]=depth_value
+                    print("here")
+                    for ii in range(480):
+                        for jj in range(640):
+                            depth_image_rgbd[ii,jj]=(jj+1+ii*640)
+                    print("dummy depth")
+                    print(depth_image_rgbd)
+                    print("finished")
+                    ## create pcd from rgbd image
+                    ## Get RGBD image
+                    depth_image_rgbd=depth_image_rgbd.astype(np.float32)
+                    print(depth_image_rgbd.shape)
+                    print(depth_image_rgbd)
+                    depth_raw = Image(depth_image_rgbd)
+                    color_raw = Image(np.array(color_frame.get_data()))
+                    rgbd_image = create_rgbd_image_from_color_and_depth(color_raw, depth_raw,
+                                                                        depth_scale=1\
+                                                                        , depth_trunc=10\
+                                                                        , convert_rgb_to_intensity=False)
+                    print("rgbd.images")
+                    #print(rgbd.image)
+                    print("rbgd.depth:")
+                    aaa=rgbd_image.depth
+                    print(np.asarray(rgbd_image.depth))
+                    pcd_rgbd = create_point_cloud_from_rgbd_image(rgbd_image, pinhole_camera_intrinsic)
+                else:
+                    frame_id-=1
+                # from points
+
+
+                if frame_id == 1:
+                    break
+        finally:
+            pipeline .stop()
+    pcd_1 = PointCloud()
+    pcd_1.points = Vector3dVector(corners_pc[:, :, 0])
+    print("mannual:")
+    print(np.asarray(pcd_1.points))
+    print("rgbd:")
+    rgbd_points=np.asarray(pcd_rgbd.points)
+    print(rgbd_points.shape)
+    print(np.asarray(pcd_rgbd.points))
+    picked_id_sequence=np.repeat(np.arange(35).reshape(35, 1), 2, axis=1)
+    #print(picked_id_sequence)
+    RT1 = auto_registration(pcd_1, pcd_1, picked_id_sequence)
+
+    return RT1
+
+if __name__ == "__main__":
+    help(create_rgbd_image_from_color_and_depth)
+    checkerboard_cali_1()

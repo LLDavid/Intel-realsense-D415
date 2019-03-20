@@ -9,7 +9,7 @@ points = rs.points()
 # Declare RealSense pipeline, encapsulating the actual device and sensors
 pipeline_1 = rs.pipeline()
 config_1 = rs.config()
-config_1.enable_device('822512060625'), # Copy the serial number from the viewer or device manager
+config_1.enable_device('821312060330'), # Copy the serial number from the viewer or device manager
 config_1.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
 config_1.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
 # Start streaming
@@ -28,6 +28,7 @@ try:
             continue
         tt = profile_1.get_stream(rs.stream.depth)
         intr = tt.as_video_stream_profile().get_intrinsics()
+
         print(intr)
 finally:
     pipeline_1.stop()

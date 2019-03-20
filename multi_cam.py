@@ -35,7 +35,6 @@ pipeline_2.start(config_2)
 pipeline_3.start(config_3)
 pipeline_4.start(config_4)
 
-
 try:
     while True:
 
@@ -111,7 +110,7 @@ try:
             cv2.imwrite("my_depth_3.jpg", depth_colormap_3)
             cv2.imwrite("my_image_4.jpg", color_image_4)
             cv2.imwrite("my_depth_4.jpg", depth_colormap_4)
-            print "Save"
+            print("save")
 
 
 finally:
