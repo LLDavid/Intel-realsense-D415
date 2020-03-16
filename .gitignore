@@ -2,3 +2,5 @@
 *.ply
 *.7z
 *.zip
+\ply
+pcd
