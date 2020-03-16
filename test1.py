@@ -13,7 +13,7 @@ def test_debug():
     corners_pc=np.zeros((PATTERN_SIZE[0]*PATTERN_SIZE[1],3,4))
     ## get corner points on checkerboard
     #SID_list = [822512060625, 821312060330, 821212061385, 822512060979]
-    SID_list = [822512060625, 821312060330]
+    SID_list = [22512060625]
     pcd=list(range(2))
     for i in range(len(SID_list)):
         SID=SID_list[i]

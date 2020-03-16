@@ -5,6 +5,8 @@ from datetime import datetime
 from pc_utils import *
 import copy
 import time
+import inspect
+
 
 file_path_1 = '.\\ply\\' + 'test_1' + '.pcd'
 file_path_2 = '.\\ply\\' + 'test_2' + '.pcd'
@@ -89,6 +91,19 @@ def auto_registration(source, target, corr):
     print(reg_p2p.transformation)
     return reg_p2p.transformation
 
+def test():
+    color_raw=Image(np.uint8(np.ones((480,640,3))))
+    depth_raw=Image(np.uint8(np.ones((480,640))*100))
+    rgbd_image = create_rgbd_image_from_color_and_depth(color_raw, depth_raw,
+                                                        depth_scale=1 / 0.001 \
+                                                        , depth_trunc=100000000 \
+                                                        , convert_rgb_to_intensity=False)
+    pcd = create_point_cloud_from_rgbd_image(rgbd_image, pinhole_camera_intrinsic)
+    picked_id_source = pick_points(pcd)
+    print(picked_id_source)
+
 if __name__ == "__main__":
-    #demo_crop_geometry(source, target)
+    # demo_crop_geometry(source, target)
     demo_manual_registration(source, target)
+    # # test()
+    # inspect.getsourcelines(pick_points)

@@ -3,6 +3,7 @@ import pyrealsense2 as rs
 import numpy as np
 from datetime import datetime
 from pc_utils import *
+from register_utils import *
 
 SID_1=822512060625
 SID_2=821312060330
@@ -39,19 +40,19 @@ try:
         pointcloud.clear()
         dt0=datetime.now()
         # Create RGBD
-        rgbd_image_1 = get_RGBDImage(pipeline_1, depth_scale_1, clipping_distance_in_meters)
-        rgbd_image_2 = get_RGBDImage(pipeline_2, depth_scale_2, clipping_distance_in_meters)
-        rgbd_image_3 = get_RGBDImage(pipeline_3, depth_scale_3, clipping_distance_in_meters)
-        rgbd_image_4 = get_RGBDImage(pipeline_4, depth_scale_4, clipping_distance_in_meters)
+        rgbd_image_1, _ = get_RGBDImage(pipeline_1, depth_scale_1, clipping_distance_in_meters)
+        rgbd_image_2, _ = get_RGBDImage(pipeline_2, depth_scale_2, clipping_distance_in_meters)
+        rgbd_image_3, _ = get_RGBDImage(pipeline_3, depth_scale_3, clipping_distance_in_meters)
+        rgbd_image_4, _ = get_RGBDImage(pipeline_4, depth_scale_4, clipping_distance_in_meters)
         if not rgbd_image_1 or not rgbd_image_2 or not rgbd_image_3 or not rgbd_image_4:
             continue
         frame_id+=1
         # Get intrinsic
         if frame_id == 1:
-            pinhole_camera_intrinsic_1 = get_pinhole_camera_intrinsic(profile_1)
-            pinhole_camera_intrinsic_2 = get_pinhole_camera_intrinsic(profile_2)
-            pinhole_camera_intrinsic_3 = get_pinhole_camera_intrinsic(profile_3)
-            pinhole_camera_intrinsic_4 = get_pinhole_camera_intrinsic(profile_4)
+            pinhole_camera_intrinsic_1 = get_pinhole_camera_intrinsic(pipeline_1)
+            pinhole_camera_intrinsic_2 = get_pinhole_camera_intrinsic(pipeline_2)
+            pinhole_camera_intrinsic_3 = get_pinhole_camera_intrinsic(pipeline_3)
+            pinhole_camera_intrinsic_4 = get_pinhole_camera_intrinsic(pipeline_4)
         # Create Point cloud from rgbd
         pcd_1 = create_point_cloud_from_rgbd_image(rgbd_image_1, pinhole_camera_intrinsic_1)
         #pcd_1.transform(RT_Matrix_1to0)
